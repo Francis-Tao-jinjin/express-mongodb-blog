@@ -88,11 +88,17 @@ module.exports = {
     1. 修改文章页：`GET /posts/:postId/edit`
     2. 修改文章：`POST /posts/:postId/edit`
 7. 删除文章：`GET /posts/:postId/remove`
-8. 留言
-    1. 创建留言：`POST /posts/:postId/comment`
-    2. 删除留言：`GET /posts/:postId/comment/:commentId/remove`
+8. 评论
+    1. 创建评论：`POST /posts/:postId/comment`
+    2. 删除评论：`GET /posts/:postId/comment/:commentId/remove`
 
 ## Session
+由于 HTTP 协议是无状态的协议，所以服务端需要记录用户的状态时，就需要用某种机制来识别具体的用户，这个机制就是会话（Session）。
+> 典型的场景比如购物车，当你点击下单按钮时，由于HTTP协议无状态，所以并不知道是哪个用户操作的，所以服务端要为特定的用户创建了特定的Session，用用于标识这个用户，并且跟踪用户，这样才知道购物车里面有几本书。这个Session是保存在服务端的，有一个唯一标识。在服务端保存Session的方法很多，内存、数据库、文件都有。集群的时候也要考虑Session的转移，在大型的网站，一般会有专门的Session服务器集群，用来保存用户会话，这个时候 Session 信息都是放在内存的，使用一些缓存服务比如Memcached之类的来放 Session。
+
+链接：https://www.zhihu.com/question/19786827/answer/28752144
+
+
 
 
 
