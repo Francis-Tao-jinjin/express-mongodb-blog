@@ -97,6 +97,105 @@ module.exports = {
 > 典型的场景比如购物车，当你点击下单按钮时，由于HTTP协议无状态，所以并不知道是哪个用户操作的，所以服务端要为特定的用户创建了特定的Session，用用于标识这个用户，并且跟踪用户，这样才知道购物车里面有几本书。这个Session是保存在服务端的，有一个唯一标识。在服务端保存Session的方法很多，内存、数据库、文件都有。集群的时候也要考虑Session的转移，在大型的网站，一般会有专门的Session服务器集群，用来保存用户会话，这个时候 Session 信息都是放在内存的，使用一些缓存服务比如Memcached之类的来放 Session。
 
 链接：https://www.zhihu.com/question/19786827/answer/28752144
+安装的 express-session 中间件就是用来支持会话的：
+```js
+app.use(session(options));
+```
+
+## 页面通知
+类似于 Android 中的 Toast，通过 connect-flash 中间件实现。
+**express-session、connect-mongo 和 connect-flash 的区别与联系**
+
+1. express-session: 会话（session）支持中间件
+2. connect-mongo: 将 session 存储于 mongodb，需结合 express-session 使用，我们也可以将 session 存储于 redis，如 connect-redis
+3. connect-flash: 基于 session 实现的用于通知功能的中间件，*需结合 express-session 使用*
+
+## 权限控制
+区分已登录用户和为登录用户，他们能够使用的功能是不同的，所以有必要在服务器确认发送请求的用户是否已经登录。由于不止一个模块要用到这个功能，所以将功能单独拿出来放到一个工具模块里：
+```bash
+mkdir middlewares
+touch middlewares/check.js
+```
+在文件中填上：
+```js
+module.exports = {
+  /* 
+  当用户信息（req.session.user）缺失，即认为用户没有登录，则跳转到登录页，同时显示 未登录的通知。
+  场景：用于需要用户登录才能操作的页面及接口
+   */
+  checkLogin: function(req, res, next) {
+    if(!req.session.user) {
+      req.flash('error', '目前还没登录');
+      return res.redirect('/signin');
+    } 
+
+    next();
+  },
+
+  /*当用户信息（req.session.user）存在，即认为用户已经登录，则跳转到之前的页面，同时显示 已登录的通知。
+  场景：如登录、注册页面及登录、注册的接口。
+  */
+  checkNotLogin: function(req, res, next) {
+    if(req.session.user) {
+      req.flash('error', '已经登录了');
+      return res.redirect('back');
+    }
+
+    next();
+  }
+}
+```
+之后将 routes 下的文件各个文件写上各自api对应的路由，具体见源代码。
+需要注意的是主程序 index.js 的改动，在这里需要把会用到的中间件都按照合法的格式注册，最好参考各个插件的 npm 官方示例，因为其中可能有的插件版本更新之后，使用方法已经改变了。
+```js
+var path = require('path');
+var express = require('express');
+var session = require('express-session');
+var MongoStore = require('connect-mongo')(session);
+var flash = require('connect-flash');
+var config = require('config-lite');
+var routes = require('./routes');
+var pkg = require('./package');  // package.json
+
+var app = express();
+
+// 设置模板目录
+app.set('views', path.join(__dirname, 'views'));
+// 设置模板引擎为 ejs
+app.set('view engine', 'ejs');
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.use(session({
+  name: config.session.key,       // 设置 cookie 中保存 session id 的字段名称
+  secret: config.session.secret,  // 通过设置 secret 来计算 hash 值并放在 cookie 中，使产生的 signedCookie 防篡改
+  resave: true,                   // 强制更新 session
+  saveUninitialized: false,       // 设置为 false，强制创建一个 session，即使用户未登录
+  cookie: {
+    maxAge: config.session.maxAge // 过期时间，过期后 cookie 中的 session id 自动删除
+  },
+  store: new MongoStore({         // 将 session 存储到 mongodb
+    url: config.mongodb           // mongodb 地址
+  })
+}));
+app.use(flash()); // *****
+
+routes(app); //注册路由
+
+// 错误处理中间件
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke! 内部错误 500');
+});
+
+app.listen(config.port, () => {
+  console.log(`${pkg.name} listening on port ${config.port}`);
+});
+```
+
+
+
+
 
 
 
